@@ -272,7 +272,15 @@ async function seedIfEmpty() {
 }
 
 async function main() {
-  await pool.query(SCHEMA);
+  // The database can still be starting when the service boots on a fresh deploy, so retry for a while.
+  for (let attempt = 1; ; attempt++) {
+    try { await pool.query(SCHEMA); break; }
+    catch (e) {
+      if (attempt >= 30) throw e;
+      console.log(`database not ready (${e.code || e.message}), retrying in 5s (${attempt}/30)`);
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+  }
   await seedIfEmpty();
   const port = process.env.PORT || 3000;
   app.listen(port, () => console.log('listening on', port));
